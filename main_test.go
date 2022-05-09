@@ -17,8 +17,8 @@ func BenchmarkDecodePackets(b *testing.B) {
 
 	// Loop through packets in file
 	for i := 0; i < b.N; i++ {
-		b.StartTimer()
 		packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
+		b.StartTimer()
 		DecodePackets(packetSource.Packets())
 		b.StopTimer()
 	}
@@ -33,8 +33,8 @@ func BenchmarkDecodePackets2(b *testing.B) {
 
 	// Loop through packets in file
 	for i := 0; i < b.N; i++ {
-		b.StartTimer()
 		packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
+		b.StartTimer()
 		DecodePackets2(packetSource.Packets())
 		b.StopTimer()
 	}

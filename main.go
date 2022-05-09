@@ -13,7 +13,8 @@ import (
 
 const (
 	// The same default as tcpdump.
-	defaultSnapLen = 262144
+	// defaultSnapLen = 262144
+	defaultSnapLen = 9216 // TODO: investigate adequate number, currently max jumbo ethernet frame
 )
 
 type packetData struct {
