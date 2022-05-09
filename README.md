@@ -15,6 +15,8 @@ PASS
 ok      pkcap   47.693s
 ```
 
+> DecodePackets2 can decode 928,505 PPS
+
 ### Links:
 
 - https://groups.google.com/g/golang-nuts/c/MOUEqi-b1S0?pli=1
