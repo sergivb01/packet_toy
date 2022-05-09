@@ -20,3 +20,8 @@ ok      pkcap   47.693s
 ### Links:
 
 - https://groups.google.com/g/golang-nuts/c/MOUEqi-b1S0?pli=1
+- https://pkg.go.dev/runtime#LockOSThread
+- https://pkg.go.dev/github.com/google/gopacket?utm_source=godoc#hdr-Pointers_To_Known_Layers
+- https://pkg.go.dev/github.com/google/gopacket#hdr-NoCopy_Decoding
+- https://pkg.go.dev/github.com/google/gopacket#hdr-Fast_Decoding_With_DecodingLayerParser
+- 
