@@ -13,3 +13,7 @@ BenchmarkDecodePackets2-16        171849              6882 ns/op
 PASS
 ok      pkcap   15.749s
 ```
+
+### Links:
+
+- https://groups.google.com/g/golang-nuts/c/MOUEqi-b1S0?pli=1

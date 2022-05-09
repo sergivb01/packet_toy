@@ -2,7 +2,12 @@ package main
 
 import (
 	hex2 "encoding/hex"
+	"errors"
+	"fmt"
+	"io"
 	"log"
+	"os"
+	"runtime"
 	"strings"
 
 	"github.com/google/gopacket"
@@ -47,7 +52,10 @@ type packetData struct {
 	Payload  []string     `json:"payload"`
 }
 
-func DecodePackets(packets <-chan gopacket.Packet) {
+func DecodePackets(packets *gopacket.PacketSource) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
 	var (
 		eth     layers.Ethernet
 		ip4     layers.IPv4
@@ -59,41 +67,57 @@ func DecodePackets(packets <-chan gopacket.Packet) {
 	parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &ip4, &ip6, &tcp, &payload)
 	decodedLayers := make([]gopacket.LayerType, 4, 4)
 
-	for packet := range packets {
-		err := parser.DecodeLayers(packet.Data(), &decodedLayers)
+	for {
+		packet, err := packets.NextPacket()
 		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return
+			}
+			panic(err)
+		}
+
+		if err := parser.DecodeLayers(packet.Data(), &decodedLayers); err != nil {
 			log.Printf("Trouble decoding layers: %v", err)
 		}
 
 		var remoteAddr string
-		pk := &packetData{}
+		pk := &packetData{
+			Payload: hex(tcp.Payload),
+		}
 		for _, typ := range decodedLayers {
 			switch typ {
 			case layers.LayerTypeEthernet:
-				pk.Ethernet.SrcAddress = eth.SrcMAC.String()
-				pk.Ethernet.DstAddress = eth.DstMAC.String()
-				pk.Ethernet.Type = eth.EthernetType.String()
-				pk.Ethernet.Length = eth.Length
-				pk.Ethernet.RawContents = hex(eth.Contents)
+				pk.Ethernet = ethernetData{
+					SrcAddress:  eth.SrcMAC.String(),
+					DstAddress:  eth.DstMAC.String(),
+					Type:        eth.EthernetType.String(),
+					Length:      eth.Length,
+					RawContents: hex(eth.Contents),
+				}
 			case layers.LayerTypeIPv4:
-				pk.IP.TTL = ip4.TTL
-				pk.IP.Protocol = ip4.Protocol.String()
-				pk.IP.SrcAddress = ip4.SrcIP.String()
-				pk.IP.DstAddress = ip4.DstIP.String()
-				pk.IP.Length = ip4.Length
-				pk.IP.RawContents = hex(ip4.Contents)
+				pk.IP = ipData{
+					TTL:         ip4.TTL,
+					Protocol:    ip4.Protocol.String(),
+					SrcAddress:  ip4.SrcIP.String(),
+					DstAddress:  ip4.DstIP.String(),
+					Length:      ip4.Length,
+					RawContents: hex(ip4.Contents),
+				}
 			case layers.LayerTypeIPv6:
-				pk.IP.TTL = ip6.HopLimit
-				pk.IP.Protocol = ip6.NextHeader.String()
-				pk.IP.SrcAddress = ip6.SrcIP.String()
-				pk.IP.DstAddress = ip6.DstIP.String()
-				pk.IP.Length = ip6.Length
-				pk.IP.RawContents = hex(ip6.Contents)
+				pk.IP = ipData{
+					TTL:         ip6.HopLimit,
+					Protocol:    ip6.NextHeader.String(),
+					SrcAddress:  ip6.SrcIP.String(),
+					DstAddress:  ip6.DstIP.String(),
+					Length:      ip6.Length,
+					RawContents: hex(ip6.Contents),
+				}
 			case layers.LayerTypeTCP:
-				pk.TCP.SrcPort = uint16(tcp.SrcPort)
-				pk.TCP.DstPort = uint16(tcp.DstPort)
-				pk.TCP.RawContents = hex(tcp.Contents)
-				pk.Payload = hex(tcp.Payload)
+				pk.TCP = tcpData{
+					SrcPort:     uint16(tcp.SrcPort),
+					DstPort:     uint16(tcp.DstPort),
+					RawContents: hex(tcp.Contents),
+				}
 			}
 		}
 
@@ -113,9 +137,110 @@ func DecodePackets(packets <-chan gopacket.Packet) {
 	}
 }
 
-func DecodePackets2(packets <-chan gopacket.Packet) {
+func DecodePackets3(packets *gopacket.PacketSource) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 
-	for packet := range packets {
+	var (
+		eth     layers.Ethernet
+		ip4     layers.IPv4
+		ip6     layers.IPv6
+		tcp     layers.TCP
+		payload gopacket.Payload
+	)
+
+	dlc := gopacket.DecodingLayerContainer(gopacket.DecodingLayerArray(nil))
+	dlc = dlc.Put(&eth)
+	dlc = dlc.Put(&ip4)
+	dlc = dlc.Put(&ip6)
+	dlc = dlc.Put(&tcp)
+	dlc = dlc.Put(&payload)
+
+	// you may specify some meaningful DecodeFeedback
+	decoder := dlc.LayersDecoder(layers.LayerTypeEthernet, gopacket.NilDecodeFeedback)
+	decoded := make([]gopacket.LayerType, 0, 20)
+
+	for {
+		packet, err := packets.NextPacket()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return
+			}
+			panic(err)
+		}
+
+		lt, err := decoder(packet.Data(), &decoded)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Could not decode layers: %v\n", err)
+			continue
+		}
+		if lt != gopacket.LayerTypeZero {
+			fmt.Fprintf(os.Stderr, "unknown layer type: %v\n", lt)
+			continue
+		}
+
+		var remoteAddr string
+		pk := &packetData{
+			Payload: hex(tcp.Payload),
+		}
+		for _, typ := range decoded {
+			switch typ {
+			case layers.LayerTypeEthernet:
+				pk.Ethernet = ethernetData{
+					SrcAddress:  eth.SrcMAC.String(),
+					DstAddress:  eth.DstMAC.String(),
+					Type:        eth.EthernetType.String(),
+					Length:      eth.Length,
+					RawContents: hex(eth.Contents),
+				}
+			case layers.LayerTypeIPv4:
+				pk.IP = ipData{
+					TTL:         ip4.TTL,
+					Protocol:    ip4.Protocol.String(),
+					SrcAddress:  ip4.SrcIP.String(),
+					DstAddress:  ip4.DstIP.String(),
+					Length:      ip4.Length,
+					RawContents: hex(ip4.Contents),
+				}
+			case layers.LayerTypeIPv6:
+				pk.IP = ipData{
+					TTL:         ip6.HopLimit,
+					Protocol:    ip6.NextHeader.String(),
+					SrcAddress:  ip6.SrcIP.String(),
+					DstAddress:  ip6.DstIP.String(),
+					Length:      ip6.Length,
+					RawContents: hex(ip6.Contents),
+				}
+			case layers.LayerTypeTCP:
+				pk.TCP = tcpData{
+					SrcPort:     uint16(tcp.SrcPort),
+					DstPort:     uint16(tcp.DstPort),
+					RawContents: hex(tcp.Contents),
+				}
+			}
+		}
+
+		if tcp.DstPort == 80 {
+			remoteAddr = pk.IP.SrcAddress
+		} else {
+			remoteAddr = pk.IP.DstAddress
+		}
+		_ = remoteAddr
+	}
+}
+
+func DecodePackets2(packets *gopacket.PacketSource) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	for {
+		packet, err := packets.NextPacket()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return
+			}
+			panic(err)
+		}
+
 		ethLayer := packet.Layer(layers.LayerTypeEthernet)
 		tcpLayer := packet.Layer(layers.LayerTypeTCP)
 
@@ -187,8 +312,7 @@ func main() {
 	packetSource.NoCopy = true
 	packetSource.Lazy = true
 
-	packets := packetSource.Packets()
-	DecodePackets(packets)
+	DecodePackets(packetSource)
 }
 
 func hex(b []byte) []string {
