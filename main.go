@@ -17,28 +17,34 @@ const (
 	defaultSnapLen = 9216 // TODO: investigate adequate number, currently max jumbo ethernet frame
 )
 
+type ethernetData struct {
+	SrcAddress  string   `json:"source"`
+	DstAddress  string   `json:"destination"`
+	Type        string   `json:"type"`
+	Length      uint16   `json:"length"`
+	RawContents []string `json:"raw_contents"`
+}
+
+type ipData struct {
+	TTL         uint8    `json:"ttl"`
+	Protocol    string   `json:"protocol"`
+	SrcAddress  string   `json:"source"`
+	DstAddress  string   `json:"destination"`
+	Length      uint16   `json:"length"`
+	RawContents []string `json:"raw_contents"`
+}
+
+type tcpData struct {
+	SrcPort     uint16   `json:"src_port"`
+	DstPort     uint16   `json:"dst_port"`
+	RawContents []string `json:"raw_contents"`
+}
+
 type packetData struct {
-	Ethernet struct {
-		SrcAddress  string   `json:"source"`
-		DstAddress  string   `json:"destination"`
-		Type        string   `json:"type"`
-		Length      uint16   `json:"length"`
-		RawContents []string `json:"raw_contents"`
-	} `json:"ethernet"`
-	IP struct {
-		TTL         uint8    `json:"ttl"`
-		Protocol    string   `json:"protocol"`
-		SrcAddress  string   `json:"source"`
-		DstAddress  string   `json:"destination"`
-		Length      uint16   `json:"length"`
-		RawContents []string `json:"raw_contents"`
-	} `json:"ip"`
-	TCP struct {
-		SrcPort     uint16   `json:"src_port"`
-		DstPort     uint16   `json:"dst_port"`
-		RawContents []string `json:"raw_contents"`
-	} `json:"tcp"`
-	Payload []string `json:"payload"`
+	Ethernet ethernetData `json:"ethernet"`
+	IP       ipData       `json:"ip"`
+	TCP      tcpData      `json:"tcp"`
+	Payload  []string     `json:"payload"`
 }
 
 func DecodePackets(packets <-chan gopacket.Packet) {
@@ -113,41 +119,47 @@ func DecodePackets2(packets <-chan gopacket.Packet) {
 		ethLayer := packet.Layer(layers.LayerTypeEthernet)
 		tcpLayer := packet.Layer(layers.LayerTypeTCP)
 
-		pk := &packetData{}
-
+		tcp, _ := tcpLayer.(*layers.TCP)
 		eth, _ := ethLayer.(*layers.Ethernet)
 
-		pk.Ethernet.SrcAddress = eth.SrcMAC.String()
-		pk.Ethernet.DstAddress = eth.DstMAC.String()
-		pk.Ethernet.Type = eth.EthernetType.String()
-		pk.Ethernet.Length = eth.Length
-		pk.Ethernet.RawContents = hex(eth.Contents)
-
-		if ip6Layer := packet.Layer(layers.LayerTypeIPv6); ip6Layer == nil {
-			ip4Layer := packet.Layer(layers.LayerTypeIPv4)
-			ip4, _ := ip4Layer.(*layers.IPv4)
-			pk.IP.TTL = ip4.TTL
-			pk.IP.Protocol = ip4.Protocol.String()
-			pk.IP.SrcAddress = ip4.SrcIP.String()
-			pk.IP.DstAddress = ip4.DstIP.String()
-			pk.IP.Length = ip4.Length
-			pk.IP.RawContents = hex(ip4.Contents)
-		} else {
-			ip6, _ := ip6Layer.(*layers.IPv6)
-
-			pk.IP.TTL = ip6.HopLimit
-			pk.IP.Protocol = ip6.NextHeader.String()
-			pk.IP.SrcAddress = ip6.SrcIP.String()
-			pk.IP.DstAddress = ip6.DstIP.String()
-			pk.IP.Length = ip6.Length
-			pk.IP.RawContents = hex(ip6.Contents)
+		pk := &packetData{
+			Ethernet: ethernetData{
+				SrcAddress:  eth.SrcMAC.String(),
+				DstAddress:  eth.DstMAC.String(),
+				Type:        eth.EthernetType.String(),
+				Length:      eth.Length,
+				RawContents: hex(eth.Contents),
+			},
+			TCP: tcpData{
+				SrcPort:     uint16(tcp.SrcPort),
+				DstPort:     uint16(tcp.DstPort),
+				RawContents: hex(tcp.Contents),
+			},
+			Payload: hex(tcp.Payload),
 		}
 
-		tcp, _ := tcpLayer.(*layers.TCP)
-		pk.TCP.SrcPort = uint16(tcp.SrcPort)
-		pk.TCP.DstPort = uint16(tcp.DstPort)
-		pk.TCP.RawContents = hex(tcp.Contents)
-		pk.Payload = hex(tcp.Payload)
+		if ip6Layer := packet.Layer(layers.LayerTypeIPv6); ip6Layer != nil {
+			ip6, _ := ip6Layer.(*layers.IPv6)
+			pk.IP = ipData{
+				TTL:         ip6.HopLimit,
+				Protocol:    ip6.NextHeader.String(),
+				SrcAddress:  ip6.SrcIP.String(),
+				DstAddress:  ip6.DstIP.String(),
+				Length:      ip6.Length,
+				RawContents: hex(ip6.Contents),
+			}
+		} else {
+			ip4Layer := packet.Layer(layers.LayerTypeIPv4)
+			ip4, _ := ip4Layer.(*layers.IPv4)
+			pk.IP = ipData{
+				TTL:         ip4.TTL,
+				Protocol:    ip4.Protocol.String(),
+				SrcAddress:  ip4.SrcIP.String(),
+				DstAddress:  ip4.DstIP.String(),
+				Length:      ip4.Length,
+				RawContents: hex(ip4.Contents),
+			}
+		}
 
 		var remoteAddr string
 
@@ -161,8 +173,7 @@ func DecodePackets2(packets <-chan gopacket.Packet) {
 }
 
 func main() {
-	handle, err := pcap.OpenLive("lo", defaultSnapLen, true,
-		pcap.BlockForever)
+	handle, err := pcap.OpenLive("lo", defaultSnapLen, true, pcap.BlockForever)
 	if err != nil {
 		panic(err)
 	}
