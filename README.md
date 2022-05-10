@@ -40,3 +40,4 @@ ok      pkcap   74.244s
 - https://pkg.go.dev/github.com/google/gopacket?utm_source=godoc#hdr-Pointers_To_Known_Layers
 - https://pkg.go.dev/github.com/google/gopacket#hdr-NoCopy_Decoding
 - https://pkg.go.dev/github.com/google/gopacket#hdr-Fast_Decoding_With_DecodingLayerParser
+- https://github.com/google/gopacket/blob/3eaba08943250fd212520e5cff00ed808b8fc60a/pcap/gopacket_benchmark/benchmark.go#L209
