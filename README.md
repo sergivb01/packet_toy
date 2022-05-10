@@ -2,6 +2,8 @@
 
 Testing gopacket for my personal website's backend
 
+### Testing benchmarks
+Dataset of 10 packets, capture of `curl localhost` against a default apache http server installation ([dataset](./test.pcap)).
 ```
 mar 10 may 2022 01:13:41 CEST
 goos: linux
@@ -14,7 +16,7 @@ BenchmarkDecodePackets3-16        349202              3482 ns/op
 PASS
 ok      pkcap   47.693s
 ```
-> DecodePackets2 can decode 928,505 PPS
+> DecodePackets2 can decode 9,285,051 PPS
 
 
 ```
