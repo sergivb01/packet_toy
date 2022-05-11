@@ -19,10 +19,10 @@ func BenchmarkDecodePackets(b *testing.B) {
 
 	// Loop through packets in file
 	for i := 0; i < b.N; i++ {
-		b.StartTimer()
 		packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 		packetSource.NoCopy = true
 		packetSource.Lazy = true
+		b.StartTimer()
 		DecodePackets(packetSource)
 		b.StopTimer()
 	}
@@ -37,10 +37,10 @@ func BenchmarkDecodePackets2(b *testing.B) {
 
 	// Loop through packets in file
 	for i := 0; i < b.N; i++ {
-		b.StartTimer()
 		packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 		packetSource.NoCopy = true
 		packetSource.Lazy = true
+		b.StartTimer()
 		DecodePackets2(packetSource)
 		b.StopTimer()
 	}
@@ -55,10 +55,10 @@ func BenchmarkDecodePackets3(b *testing.B) {
 
 	// Loop through packets in file
 	for i := 0; i < b.N; i++ {
-		b.StartTimer()
 		packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 		packetSource.NoCopy = true
 		packetSource.Lazy = true
+		b.StartTimer()
 		DecodePackets3(packetSource)
 		b.StopTimer()
 	}
