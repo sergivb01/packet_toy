@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -50,10 +51,13 @@ type tcpData struct {
 }
 
 type packetData struct {
-	Ethernet ethernetData `json:"ethernet"`
-	IP       ipData       `json:"ip"`
-	TCP      tcpData      `json:"tcp"`
-	Payload  []string     `json:"payload"`
+	Ethernet      ethernetData `json:"ethernet"`
+	IP            ipData       `json:"ip"`
+	TCP           tcpData      `json:"tcp"`
+	Payload       []string     `json:"payload"`
+	Timestamp     time.Time    `json:"timestamp"`
+	Length        int          `json:"length"`
+	CaptureLength int          `json:"capture_length"`
 }
 
 func main() {
@@ -134,7 +138,10 @@ func capture(c chan os.Signal, packetSource *gopacket.PacketSource) {
 				DstPort:     uint16(tcp.DstPort),
 				RawContents: hex(tcp.Contents),
 			},
-			Payload: hex(tcp.Payload),
+			Payload:       hex(tcp.Payload),
+			Timestamp:     packet.Metadata().Timestamp,
+			Length:        packet.Metadata().Length,
+			CaptureLength: packet.Metadata().CaptureLength,
 		}
 
 		if ip6Layer := packet.Layer(layers.LayerTypeIPv6); ip6Layer != nil {
