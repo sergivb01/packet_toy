@@ -11,7 +11,6 @@ import (
 	"os/signal"
 	"runtime"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -93,16 +92,6 @@ func main() {
 	log.Printf("shutting down :P")
 }
 
-type abc struct {
-	lock *sync.Mutex
-	data map[string][]packetData
-}
-
-var test = abc{
-	lock: &sync.Mutex{},
-	data: make(map[string][]packetData),
-}
-
 func capture(c chan os.Signal, packetSource *gopacket.PacketSource) {
 	for {
 		select {
@@ -167,16 +156,20 @@ func capture(c chan os.Signal, packetSource *gopacket.PacketSource) {
 			}
 		}
 
-		var remoteAddr string
+		var (
+			remoteAddr string
+			remotePort uint16
+		)
 		if tcp.DstPort == 80 {
-			remoteAddr = fmt.Sprintf("%s:%d", pk.IP.SrcAddress, pk.TCP.SrcPort)
+			remoteAddr = pk.IP.SrcAddress
+			remotePort = pk.TCP.SrcPort
 		} else {
-			remoteAddr = fmt.Sprintf("%s:%d", pk.IP.DstAddress, pk.TCP.DstPort)
+			remoteAddr = pk.IP.DstAddress
+			remotePort = pk.TCP.DstPort
 		}
 
-		test.lock.Lock()
-		test.data[remoteAddr] = append(test.data[remoteAddr], *pk)
-		test.lock.Unlock()
+		_ = remoteAddr
+		_ = remotePort
 	}
 }
 
